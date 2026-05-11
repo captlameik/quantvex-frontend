@@ -85,7 +85,15 @@ export default function TradeSignalsPage() {
       setMsg(`AI Intelligence routing complete: ${r?.signal_count || 0} signals generated.`);
       await load();
     } catch (e: any) {
-      setErr(`Failed to ping the engine: ${e.message}`);
+      if (e.status === 0 || e.message?.includes('Network error')) {
+        setErr('Cannot reach the API backend. Please ensure all services are running (docker compose up).');
+      } else if (e.status === 404) {
+        setErr('API backend is unreachable (HTTP 404). Please start the backend services and try again.');
+      } else if (e.status === 402) {
+        setErr('Active subscription required to generate signals. Please upgrade your plan.');
+      } else {
+        setErr(`Engine error: ${e.message}`);
+      }
     } finally {
       setGenerating(false);
     }
