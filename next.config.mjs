@@ -5,6 +5,15 @@ const apiProxy =
 const nextConfig = {
   output: 'standalone',
   async rewrites() {
+    // If deployed on Vercel, route /api to the Vercel experimental API service /_/api
+    if (process.env.VERCEL === '1') {
+      return [
+        {
+          source: '/api/:path*',
+          destination: '/_/api/:path*',
+        },
+      ];
+    }
     return [
       {
         source: '/api/:path*',

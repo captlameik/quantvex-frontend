@@ -127,15 +127,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Logo */}
         <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none' }}>
-            <div style={{
-              width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0,
-              background: 'linear-gradient(135deg,#00ff88,#0ea5e9)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
-              </svg>
-            </div>
+            <img src="/logo.png" alt="AIXTrader" style={{ width: 30, height: 30, borderRadius: 8 }} />
             <span style={{ fontWeight: 700, fontSize: '0.9rem', letterSpacing: '-0.02em', color: '#fff' }}>
               AIX<span style={{ background: 'linear-gradient(90deg,#00ff88,#0ea5e9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Trader</span>
             </span>

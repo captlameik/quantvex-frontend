@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch, ApiError } from '@/lib/apiClient';
 
@@ -57,6 +57,9 @@ export default function PricingPage() {
   const [loading, setLoading] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [freeMode, setFreeMode] = useState(false);
+  const [freeModeLoading, setFreeModeLoading] = useState(true);
+
   const valueChecklist = useMemo(() => ([
     'Guided onboarding to first signal',
     'Risk-aware AI execution controls',
@@ -64,7 +67,20 @@ export default function PricingPage() {
     'Flexible plan upgrade and cancellation',
   ]), []);
 
+  // Check if platform is in free mode
+  useEffect(() => {
+    apiFetch<{ free_mode: boolean }>('/stats/free-mode', {})
+      .then(res => { setFreeMode(res?.free_mode ?? false); })
+      .catch(() => { setFreeMode(false); })
+      .finally(() => setFreeModeLoading(false));
+  }, []);
+
   const handleSubscribe = async (planId: string) => {
+    if (freeMode) {
+      window.location.href = '/sign-up';
+      return;
+    }
+
     setMessage(''); setError(''); setLoading(planId);
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (!token) {
@@ -113,11 +129,12 @@ export default function PricingPage() {
 
       <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(5,10,18,0.9)', backdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border-subtle)', padding: '0 24px' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link href="/" style={{ fontWeight: 700, fontSize: '1rem', textDecoration: 'none', color: 'var(--text-primary)' }}>
-            ⚡ AIX<span className="gradient-text">Trader</span>
+          <Link href="/" style={{ fontWeight: 700, fontSize: '1rem', textDecoration: 'none', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img src="/logo.png" alt="AIXTrader" style={{ width: 28, height: 28, borderRadius: 6 }} />
+            AIX<span className="gradient-text">Trader</span>
           </Link>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Link href="/login" style={{ padding: '7px 14px', fontSize: '0.8125rem', color: 'var(--text-secondary)', textDecoration: 'none', border: '1px solid var(--border-default)', borderRadius: 8 }}>Login</Link>
+            <Link href="/sign-in" style={{ padding: '7px 14px', fontSize: '0.8125rem', color: 'var(--text-secondary)', textDecoration: 'none', border: '1px solid var(--border-default)', borderRadius: 8 }}>Login</Link>
             <Link href="/dashboard" style={{ padding: '7px 14px', fontSize: '0.8125rem', color: 'var(--text-primary)', textDecoration: 'none', background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: '1px solid var(--border-default)' }}>Dashboard</Link>
           </div>
         </div>
@@ -130,9 +147,27 @@ export default function PricingPage() {
             Choose your <span className="gradient-text">activation path</span>
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '1.0625rem', maxWidth: 480, margin: '0 auto' }}>
-            Start with signal intelligence or unlock full automated execution.
+            {freeMode
+              ? '🎉 The platform is currently FREE for all users. Sign up and get full access!'
+              : 'Start with signal intelligence or unlock full automated execution.'}
           </p>
         </div>
+
+        {/* Free Mode Banner */}
+        {freeMode && !freeModeLoading && (
+          <div style={{
+            padding: '20px 28px', borderRadius: '16px', marginBottom: '32px', textAlign: 'center',
+            background: 'linear-gradient(135deg, rgba(0,255,136,0.08), rgba(14,165,233,0.08))',
+            border: '1px solid rgba(0,255,136,0.3)',
+          }}>
+            <p style={{ fontSize: '1.25rem', fontWeight: 800, color: '#00ff88', marginBottom: '6px' }}>
+              🎊 FREE ACCESS ENABLED
+            </p>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              All plans are currently free. Create an account to start trading with AI-powered signals immediately.
+            </p>
+          </div>
+        )}
 
         <div className="hero-grid" style={{ alignItems: 'start', gap: 24, marginBottom: 32 }}>
           {PLANS.map(plan => (
@@ -143,8 +178,17 @@ export default function PricingPage() {
             >
               <span className={`badge badge-${plan.accent}`} style={{ marginBottom: 16 }}>{plan.name}</span>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 20 }}>
-                <span style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.03em', color: plan.accent === 'green' ? 'var(--neon-green)' : 'var(--electric-blue)' }}>{plan.price}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{plan.period}</span>
+                {freeMode ? (
+                  <>
+                    <span style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#00ff88' }}>FREE</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem', textDecoration: 'line-through', marginLeft: '8px' }}>{plan.price}{plan.period}</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.03em', color: plan.accent === 'green' ? 'var(--neon-green)' : 'var(--electric-blue)' }}>{plan.price}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{plan.period}</span>
+                  </>
+                )}
               </div>
               <ul style={{ listStyle: 'none', marginBottom: 28, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {plan.features.map(f => (
@@ -154,7 +198,7 @@ export default function PricingPage() {
                     display: 'flex', gap: 8,
                   }}>
                     <span style={{ color: f.startsWith('✓') ? 'var(--neon-green)' : 'var(--text-muted)', flexShrink: 0 }}>
-                      {f[0]}
+                      {freeMode && f.startsWith('✗') ? '✓' : f[0]}
                     </span>
                     {f.slice(2)}
                   </li>
@@ -166,39 +210,38 @@ export default function PricingPage() {
                 className={plan.accent === 'green' ? 'btn-primary' : 'btn-secondary'}
                 style={{ width: '100%', justifyContent: 'center', opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
               >
-                {loading === plan.id ? 'Redirecting…' : plan.cta}
+                {loading === plan.id ? 'Redirecting…' : freeMode ? 'Get Started Free' : plan.cta}
               </button>
               <p style={{ marginTop: 10, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                No lock-in contract. Upgrade or downgrade any time.
+                {freeMode ? 'No credit card required.' : 'No lock-in contract. Upgrade or downgrade any time.'}
               </p>
             </div>
           ))}
         </div>
 
-        <div className="glass-card" style={{ padding: 24, marginBottom: 24 }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>Payment Methods</p>
-          <div className="features-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-            {PAYMENT_METHODS.map(m => (
-              <button
-                key={m.id}
-                onClick={() => setSelectedMethod(m.id)}
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  border: `1px solid ${selectedMethod === m.id ? 'var(--neon-green)' : 'var(--border-default)'}`,
-                  background: selectedMethod === m.id ? 'rgba(0,255,136,0.06)' : 'var(--bg-card)',
-                  color: selectedMethod === m.id ? 'var(--neon-green)' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: 4 }}>{m.label}</div>
-                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{m.desc}</div>
-              </button>
-            ))}
+        {!freeMode && (
+          <div className="glass-card" style={{ padding: 24, marginBottom: 24 }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>Payment Methods</p>
+            <div className="features-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+              {PAYMENT_METHODS.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedMethod(m.id)}
+                  style={{
+                    padding: '12px 14px', borderRadius: 10,
+                    border: `1px solid ${selectedMethod === m.id ? 'var(--neon-green)' : 'var(--border-default)'}`,
+                    background: selectedMethod === m.id ? 'rgba(0,255,136,0.06)' : 'var(--bg-card)',
+                    color: selectedMethod === m.id ? 'var(--neon-green)' : 'var(--text-secondary)',
+                    cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: 4 }}>{m.label}</div>
+                  <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{m.desc}</div>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="glass-card" style={{ padding: 24, marginBottom: 24 }}>
           <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>

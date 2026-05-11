@@ -3,32 +3,35 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useUser, useAuth } from '@clerk/nextjs';
 import DashboardLayout from '@/components/Layout';
 import { apiFetch } from '@/lib/apiClient';
 
 export default function AccountPage() {
   const router = useRouter();
+  const { user, isLoaded: userLoaded } = useUser();
+  const { getToken, isLoaded: authLoaded } = useAuth();
   const [active, setActive] = useState<boolean | null>(null);
-  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
+  const email = user?.primaryEmailAddress?.emailAddress || '';
 
   useEffect(() => {
-    if (!token) { router.push('/login'); return; }
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload?.sub) setEmail(payload.sub);
-    } catch {}
-    apiFetch<{ active: boolean }>('/subscriptions/me', {}, token)
-      .then(r => setActive(r.active))
-      .catch(() => setActive(false));
-  }, [token, router]);
+    if (!authLoaded || !userLoaded) return;
+    if (!user) { router.push('/sign-in'); return; }
+    (async () => {
+      const token = await getToken();
+      apiFetch<{ active: boolean }>('/subscriptions/me', {}, token)
+        .then(r => setActive(r.active))
+        .catch(() => setActive(false));
+    })();
+  }, [authLoaded, userLoaded, user, router, getToken]);
 
   async function startSubscription() {
     setLoading(true); setError('');
     try {
+      const token = await getToken();
       const res = await apiFetch<{ checkout_url: string }>('/subscriptions/checkout-url', {}, token);
       window.location.href = res.checkout_url;
     } catch (e: any) { setError(e.message); setLoading(false); }

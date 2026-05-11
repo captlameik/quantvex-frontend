@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import DashboardLayout from '@/components/Layout';
 import { apiFetch } from '@/lib/apiClient';
 
@@ -18,22 +19,26 @@ type Trade = {
 };
 
 export default function TradeHistoryPage() {
+  const { getToken, isLoaded } = useAuth();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token') ?? '';
-    apiFetch<Trade[]>('/trades/', {}, token)
-      .then(data => {
-        setTrades(data || []);
-        setIsLoading(false);
-      })
-      .catch(e => {
-        setError(e.message);
-        setIsLoading(false);
-      });
-  }, []);
+    if (!isLoaded) return;
+    (async () => {
+      const token = await getToken();
+      apiFetch<Trade[]>('/trades/', {}, token)
+        .then(data => {
+          setTrades(data || []);
+          setIsLoading(false);
+        })
+        .catch(e => {
+          setError(e.message);
+          setIsLoading(false);
+        });
+    })();
+  }, [isLoaded, getToken]);
 
   return (
     <DashboardLayout>

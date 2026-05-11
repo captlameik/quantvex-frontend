@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import DashboardLayout from '@/components/Layout';
 import { apiFetch } from '@/lib/apiClient';
 
@@ -34,6 +35,7 @@ const LabelInput = ({ label, type = 'text', value, onChange, placeholder, hint }
 );
 
 export default function BrokersPage() {
+  const { getToken, isLoaded } = useAuth();
   const [brokers, setBrokers] = useState<Broker[]>([]);
   const [subMode, setSubMode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +51,7 @@ export default function BrokersPage() {
   const isMt4Mt5 = ['exness', 'mt4', 'mt5'].includes(brokerName);
 
   const fetchData = async () => {
-    const token = localStorage.getItem('token') ?? '';
+    const token = await getToken();
     try {
       const [brokerData, subData] = await Promise.all([
         apiFetch<Broker[]>('/brokers', {}, token),
@@ -61,12 +63,12 @@ export default function BrokersPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (isLoaded) fetchData(); }, [isLoaded]);
 
   const handleAddBroker = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitLoading(true); setError(''); setSuccess('');
-    const token = localStorage.getItem('token') ?? '';
+    const token = await getToken();
     try {
       await apiFetch('/brokers', { method:'POST', body: JSON.stringify({ broker_name:brokerName, api_key:apiKey, api_secret:apiSecret, account_id:accountId, is_active:true }) }, token);
       setApiKey(''); setApiSecret(''); setAccountId('');
@@ -78,7 +80,7 @@ export default function BrokersPage() {
 
   const handleRemoveBroker = async (id: number) => {
     if (!confirm('Remove this broker connection?')) return;
-    const token = localStorage.getItem('token') ?? '';
+    const token = await getToken();
     try { await apiFetch(`/brokers/${id}`, { method:'DELETE' }, token); setBrokers(brokers.filter(b=>b.id!==id)); }
     catch (err: any) { setError(err.message || 'Failed to remove broker'); }
   };

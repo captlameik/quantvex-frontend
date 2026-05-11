@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import DashboardLayout from '@/components/Layout';
 import { apiFetch } from '@/lib/apiClient';
 
@@ -57,20 +58,24 @@ const GaugeCard = ({ label, value, display, color, subtext, max = 100 }: { label
 
 export default function RiskMetricsPage() {
   const router = useRouter();
+  const { getToken, isLoaded } = useAuth();
   const [risk, setRisk] = useState<Risk | null>(null);
   const [tradeCount, setTradeCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) { router.push('/login'); return; }
-    apiFetch<Trade[]>('/trades/', {}, token).then(data => {
-      const closed = (data || []).filter(t => t.pnl != null);
-      setTradeCount(closed.length);
-      setRisk(computeRisk(closed.map(t => t.pnl as number)));
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [router]);
+    if (!isLoaded) return;
+    (async () => {
+      const token = await getToken();
+      if (!token) { router.push('/sign-in'); return; }
+      apiFetch<Trade[]>('/trades/', {}, token).then(data => {
+        const closed = (data || []).filter(t => t.pnl != null);
+        setTradeCount(closed.length);
+        setRisk(computeRisk(closed.map(t => t.pnl as number)));
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    })();
+  }, [router, isLoaded, getToken]);
 
   return (
     <DashboardLayout>

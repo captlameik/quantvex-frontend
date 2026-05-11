@@ -145,12 +145,7 @@ export default function LandingPage() {
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: 'linear-gradient(135deg, #00ff88, #0ea5e9)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 16, fontWeight: 800,
-            }}>⚡</div>
+            <img src="/logo.png" alt="AIXTrader" style={{ width: 32, height: 32, borderRadius: 8 }} />
             <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               AIX<span className="gradient-text">Trader</span>
             </span>
@@ -334,7 +329,8 @@ export default function LandingPage() {
       <footer style={{ borderTop: '1px solid var(--border-subtle)', padding: '28px 24px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <span style={{ fontWeight: 700, fontSize: '0.9375rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            ⚡ AIX<span className="gradient-text">Trader</span>
+            <img src="/logo.png" alt="AIXTrader" style={{ width: 20, height: 20, borderRadius: 4 }} />
+            AIX<span className="gradient-text">Trader</span>
           </span>
           <div style={{ display: 'flex', gap: 20 }}>
             {[['Pricing', '/pricing'], ['Get Started', '/register'], ['Dashboard', '/dashboard']].map(([label, href]) => (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import DashboardLayout from '@/components/Layout';
 import { apiFetch } from '@/lib/apiClient';
 
@@ -52,33 +53,37 @@ const MiniBar = ({ pnl, max }: { pnl: number; max: number }) => {
 
 export default function PerformancePage() {
   const router = useRouter();
+  const { getToken, isLoaded } = useAuth();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) { router.push('/login'); return; }
-    apiFetch<Trade[]>('/trades/', {}, token).then(data => {
-      const closed = (data || []).filter(t => t.pnl != null);
-      const pnls = closed.map(t => t.pnl as number);
-      const winners = pnls.filter(p => p > 0);
-      const losers = pnls.filter(p => p <= 0);
-      setTrades(closed);
-      setMetrics({
-        totalPnl: pnls.reduce((a, b) => a + b, 0),
-        winRate: closed.length ? (winners.length / closed.length) * 100 : 0,
-        totalTrades: closed.length,
-        winners: winners.length,
-        losers: losers.length,
-        bestTrade: winners.length ? Math.max(...winners) : 0,
-        worstTrade: losers.length ? Math.min(...losers) : 0,
-        avgWin: winners.length ? winners.reduce((a,b)=>a+b,0)/winners.length : 0,
-        avgLoss: losers.length ? losers.reduce((a,b)=>a+b,0)/losers.length : 0,
-      });
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [router]);
+    if (!isLoaded) return;
+    (async () => {
+      const token = await getToken();
+      if (!token) { router.push('/sign-in'); return; }
+      apiFetch<Trade[]>('/trades/', {}, token).then(data => {
+        const closed = (data || []).filter(t => t.pnl != null);
+        const pnls = closed.map(t => t.pnl as number);
+        const winners = pnls.filter(p => p > 0);
+        const losers = pnls.filter(p => p <= 0);
+        setTrades(closed);
+        setMetrics({
+          totalPnl: pnls.reduce((a, b) => a + b, 0),
+          winRate: closed.length ? (winners.length / closed.length) * 100 : 0,
+          totalTrades: closed.length,
+          winners: winners.length,
+          losers: losers.length,
+          bestTrade: winners.length ? Math.max(...winners) : 0,
+          worstTrade: losers.length ? Math.min(...losers) : 0,
+          avgWin: winners.length ? winners.reduce((a,b)=>a+b,0)/winners.length : 0,
+          avgLoss: losers.length ? losers.reduce((a,b)=>a+b,0)/losers.length : 0,
+        });
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    })();
+  }, [router, isLoaded, getToken]);
 
   const maxAbs = metrics ? Math.max(Math.abs(metrics.bestTrade), Math.abs(metrics.worstTrade)) : 1;
 

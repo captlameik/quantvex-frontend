@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import DashboardLayout from '@/components/Layout';
 import { apiFetch } from '@/lib/apiClient';
 
@@ -28,6 +29,19 @@ type User = {
   is_admin: boolean;
 };
 
+type EngineStatus = {
+  engine_connected: boolean;
+  engine_type: string;
+  supported_symbols: string[];
+  strategies: string[];
+  modules_loaded: string[];
+  modules_failed: string[];
+  modules_total: number;
+  modules_active: number;
+  capabilities: Record<string, boolean>;
+  last_check: string;
+};
+
 const StatCard = ({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) => (
   <div style={{
     background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '16px',
@@ -44,48 +58,72 @@ const StatCard = ({ label, value, sub, color }: { label: string; value: string |
 );
 
 export default function AdminPage() {
+  const { getToken } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [freeMode, setFreeMode] = useState(false);
+  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
-
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
+  const [actionLoading, setActionLoading] = useState('');
 
   useEffect(() => {
-    if (!token) return;
-    Promise.all([
-      apiFetch<AdminStats>('/admin/stats', {}, token).catch(() => null),
-      apiFetch<User[]>('/admin/users', {}, token).catch(() => []),
-      apiFetch<AuditLog[]>('/admin/audit-logs', {}, token).catch(() => []),
-    ]).then(([s, u, l]) => {
-      if (s) setStats(s);
-      setUsers(u || []);
-      setLogs(l || []);
-      setLoading(false);
-    }).catch(e => { setError(e.message); setLoading(false); });
-  }, [token]);
+    async function loadData() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const [s, u, l, fm, es] = await Promise.all([
+          apiFetch<AdminStats>('/admin/stats', {}, token).catch(() => null),
+          apiFetch<User[]>('/admin/users', {}, token).catch(() => []),
+          apiFetch<AuditLog[]>('/admin/audit-logs', {}, token).catch(() => []),
+          apiFetch<{ free_mode: boolean }>('/admin/free-mode', {}, token).catch(() => ({ free_mode: false })),
+          apiFetch<EngineStatus>('/admin/engine-status', {}, token).catch(() => null),
+        ]);
+        if (s) setStats(s);
+        setUsers(u || []);
+        setLogs(l || []);
+        setFreeMode(fm?.free_mode ?? false);
+        setEngineStatus(es);
+        setLoading(false);
+      } catch (e: any) { setError(e.message); setLoading(false); }
+    }
+    loadData();
+  }, [getToken]);
+
+  const showMsg = (msg: string) => { setSuccess(msg); setTimeout(() => setSuccess(''), 4000); };
+
+  async function toggleFreeMode() {
+    setActionLoading('free'); setError('');
+    try {
+      const token = await getToken();
+      const res = await apiFetch<{ free_mode: boolean; message: string }>('/admin/free-mode/toggle', { method: 'POST' }, token);
+      setFreeMode(res.free_mode);
+      showMsg(`✅ ${res.message}`);
+    } catch (e: any) { setError(e.message); }
+    setActionLoading('');
+  }
 
   async function toggleUserActive(u: User) {
     try {
+      const token = await getToken();
       const path = u.is_active ? `/admin/users/${u.id}/deactivate` : `/admin/users/${u.id}/activate`;
       await apiFetch(path, { method: 'POST' }, token);
       setUsers(prev => prev.map(p => (p.id === u.id ? { ...p, is_active: !u.is_active } : p)));
     } catch (e: any) { setError(e.message); }
   }
 
-  async function handleHalt() {
+  async function handleAction(action: string, endpoint: string) {
+    setActionLoading(action); setError('');
     try {
-      await apiFetch('/admin/halt', { method: 'POST' }, token);
-      setStats(prev => prev ? { ...prev, engine_health: 'HALTED' } : null);
+      const token = await getToken();
+      const res = await apiFetch<{ message: string }>(endpoint, { method: 'POST' }, token);
+      showMsg(`✅ ${res.message}`);
+      if (action === 'halt') setStats(prev => prev ? { ...prev, engine_health: 'HALTED' } : null);
+      if (action === 'resume') setStats(prev => prev ? { ...prev, engine_health: 'HEALTHY' } : null);
     } catch (e: any) { setError(e.message); }
-  }
-
-  async function handleResume() {
-    try {
-      await apiFetch('/admin/resume', { method: 'POST' }, token);
-      setStats(prev => prev ? { ...prev, engine_health: 'HEALTHY' } : null);
-    } catch (e: any) { setError(e.message); }
+    setActionLoading('');
   }
 
   return (
@@ -103,12 +141,17 @@ export default function AdminPage() {
             <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#f59e0b' }}>Admin Access</span>
           </div>
           <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '6px' }}>Admin Console</h1>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Platform overview, user management, and system health.</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Platform overview, user management, engine controls, and pricing mode.</p>
         </div>
 
         {error && (
           <div style={{ padding: '14px 18px', borderRadius: '12px', background: 'rgba(255,94,122,0.08)', border: '1px solid rgba(255,94,122,0.2)', color: '#ff5e7a', fontSize: '0.875rem', marginBottom: '24px' }}>
             ⚠ {error}
+          </div>
+        )}
+        {success && (
+          <div style={{ padding: '14px 18px', borderRadius: '12px', background: 'rgba(0,255,136,0.08)', border: '1px solid rgba(0,255,136,0.2)', color: '#00ff88', fontSize: '0.875rem', marginBottom: '24px' }}>
+            {success}
           </div>
         )}
 
@@ -124,6 +167,91 @@ export default function AdminPage() {
             <StatCard label="Execution Health" value={`${stats.failure_rate}%`} sub="Failure Rate (24h)" color={stats.failure_rate < 5 ? '#00ff88' : '#f59e0b'} />
           </div>
         )}
+
+        {/* Free Mode + Engine Status Banner */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+          {/* Free Mode Toggle */}
+          <div style={{
+            background: freeMode ? 'rgba(0,255,136,0.06)' : 'var(--bg-card)',
+            border: `1px solid ${freeMode ? 'rgba(0,255,136,0.3)' : 'var(--border-subtle)'}`,
+            borderRadius: '16px', padding: '24px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div>
+                <p style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: freeMode ? '#00ff88' : 'var(--text-muted)', marginBottom: '4px' }}>
+                  💸 Free Mode
+                </p>
+                <p style={{ fontSize: '1.25rem', fontWeight: 800, color: freeMode ? '#00ff88' : 'var(--text-primary)' }}>
+                  {freeMode ? 'ENABLED' : 'DISABLED'}
+                </p>
+              </div>
+              <button
+                onClick={toggleFreeMode}
+                disabled={actionLoading === 'free'}
+                style={{
+                  padding: '10px 20px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+                  transition: 'all 0.2s', border: 'none',
+                  background: freeMode ? 'rgba(255,94,122,0.15)' : 'rgba(0,255,136,0.15)',
+                  color: freeMode ? '#ff5e7a' : '#00ff88',
+                  opacity: actionLoading === 'free' ? 0.6 : 1,
+                }}
+              >
+                {actionLoading === 'free' ? '...' : freeMode ? 'Disable Free Mode' : 'Enable Free Mode'}
+              </button>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {freeMode
+                ? 'All users currently have full access without needing a subscription.'
+                : 'Users must have an active subscription to access signals and trading.'}
+            </p>
+          </div>
+
+          {/* Engine Status */}
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+            borderRadius: '16px', padding: '24px',
+          }}>
+            <p style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              🧠 Engine Bridge
+            </p>
+            {engineStatus ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: engineStatus.engine_connected ? '#00ff88' : '#ff5e7a' }} />
+                  <span style={{ fontSize: '0.875rem', fontWeight: 700, color: engineStatus.engine_connected ? '#00ff88' : '#ff5e7a' }}>
+                    {engineStatus.engine_connected ? 'Connected' : 'Fallback Mode'}
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{engineStatus.engine_type}</p>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                  {engineStatus.supported_symbols.length} symbols · {engineStatus.strategies.length} strategies
+                </p>
+                {engineStatus.modules_loaded && engineStatus.modules_loaded.length > 0 && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <p style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Active Modules ({engineStatus.modules_active}/{engineStatus.modules_total})</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {engineStatus.modules_loaded.map(m => (
+                        <span key={m} style={{ background: 'rgba(0,255,136,0.1)', color: '#00ff88', border: '1px solid rgba(0,255,136,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem' }}>{m}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {engineStatus.modules_failed && engineStatus.modules_failed.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Failed Modules</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {engineStatus.modules_failed.map(m => (
+                        <span key={m} style={{ background: 'rgba(255,94,122,0.1)', color: '#ff5e7a', border: '1px solid rgba(255,94,122,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem' }}>{m}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Loading engine status...</p>
+            )}
+          </div>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '24px', marginBottom: '40px' }}>
           {/* Audit Logs */}
@@ -163,21 +291,37 @@ export default function AdminPage() {
              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>System Controls</h2>
              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <button 
-                  onClick={handleHalt}
+                  onClick={() => handleAction('halt', '/admin/halt')}
+                  disabled={!!actionLoading}
                   className="btn-secondary" 
                   style={{ width: '100%', justifyContent: 'center', color: '#ff5e7a', borderColor: 'rgba(255,94,122,0.2)' }}
                 >
-                  Trigger Emergency Halt
+                  {actionLoading === 'halt' ? 'Halting...' : 'Trigger Emergency Halt'}
                 </button>
                 <button 
-                  onClick={handleResume}
+                  onClick={() => handleAction('resume', '/admin/resume')}
+                  disabled={!!actionLoading}
                   className="btn-secondary" 
                   style={{ width: '100%', justifyContent: 'center', color: '#00ff88', borderColor: 'rgba(0,255,136,0.2)' }}
                 >
-                  Resume Signal Flow
+                  {actionLoading === 'resume' ? 'Resuming...' : 'Resume Signal Flow'}
                 </button>
-                <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>Clear System Cache</button>
-                <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>Force Model Retrain</button>
+                <button 
+                  onClick={() => handleAction('cache', '/admin/clear-cache')}
+                  disabled={!!actionLoading}
+                  className="btn-secondary" 
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
+                  {actionLoading === 'cache' ? 'Clearing...' : 'Clear System Cache'}
+                </button>
+                <button 
+                  onClick={() => handleAction('retrain', '/admin/force-retrain')}
+                  disabled={!!actionLoading}
+                  className="btn-secondary" 
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
+                  {actionLoading === 'retrain' ? 'Scheduling...' : 'Force Model Retrain'}
+                </button>
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '8px 0' }} />
                 <div style={{ padding: '12px', borderRadius: '12px', background: 'rgba(0,255,136,0.05)', border: '1px solid rgba(0,255,136,0.1)' }}>
                    <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#00ff88', marginBottom: '4px' }}>ESTIMATED MRR</p>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import DashboardLayout from '@/components/Layout';
 import { apiFetch, ApiError } from '@/lib/apiClient';
 
@@ -47,6 +48,7 @@ const TAWidget = ({ symbol }: { symbol: string }) => {
 
 export default function TradeSignalsPage() {
   const router = useRouter();
+  const { getToken, isLoaded } = useAuth();
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -54,9 +56,10 @@ export default function TradeSignalsPage() {
   const [err, setErr] = useState('');
 
   const load = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) { router.push('/login'); return; }
+    if (!isLoaded) return;
     try {
+      const token = await getToken();
+      if (!token) { router.push('/sign-in'); return; }
       const data = await apiFetch<Signal[]>('/signals/?limit=50', {}, token).catch(e => {
         if (e instanceof ApiError && e.status === 402) {
            router.push('/pricing');
@@ -70,14 +73,15 @@ export default function TradeSignalsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, isLoaded, getToken]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (isLoaded) load(); }, [load, isLoaded]);
 
   const generate = async () => {
     setGenerating(true); setMsg(''); setErr('');
     try {
-      const r = await apiFetch<any>('/signals/generate', { method: 'POST' });
+      const token = await getToken();
+      const r = await apiFetch<any>('/signals/generate', { method: 'POST' }, token);
       setMsg(`AI Intelligence routing complete: ${r?.signal_count || 0} signals generated.`);
       await load();
     } catch (e: any) {
