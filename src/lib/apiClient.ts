@@ -1,13 +1,16 @@
 const normalizeApiBase = (value: string) => value.replace(/\/+$/, '');
 
 /**
- * Prefer NEXT_PUBLIC_API_URL. Default is same-origin `/api/v1` so it works
- * behind nginx (Docker) and with Next dev rewrites to the API — not bare
- * :8000, which is often unpublished in compose.
+ * Prefer NEXT_PUBLIC_API_URL. When set, append /api/v1 unless it already
+ * contains that path segment.  Default is same-origin `/api/v1` so it works
+ * behind nginx (Docker) and with Next dev rewrites to the API.
  */
 const defaultApiBase = (() => {
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return normalizeApiBase(process.env.NEXT_PUBLIC_API_URL);
+    const base = normalizeApiBase(process.env.NEXT_PUBLIC_API_URL);
+    // If the env var already ends with /api/v1, use as-is
+    if (base.endsWith('/api/v1')) return base;
+    return `${base}/api/v1`;
   }
   return '/api/v1';
 })();
