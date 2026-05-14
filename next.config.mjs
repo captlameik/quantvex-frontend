@@ -4,6 +4,20 @@ const apiProxy =
 
 const nextConfig = {
   output: 'standalone',
+  async headers() {
+    return [
+      {
+        // Apply to all routes
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'index, follow',
+          },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     // If deployed on Vercel, route /api to the Vercel experimental API service /_/api
     if (process.env.VERCEL === '1') {

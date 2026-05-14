@@ -2,10 +2,41 @@ import './globals.css';
 import { ReactNode } from 'react';
 import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'AI Trading SaaS',
-  description: 'AI-powered trading signals and automation.',
+export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://quantvex.dev'),
+  title: {
+    default: 'Quantvex — AI-Powered Trading Signals & Automation',
+    template: '%s | Quantvex',
+  },
+  description:
+    'High-confidence AI trading signals, automated execution, and risk-first controls. Join 1,200+ traders using model-backed workflows.',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'Quantvex',
+    title: 'Quantvex — AI-Powered Trading Signals & Automation',
+    description:
+      'High-confidence AI trading signals, automated execution, and risk-first controls.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Quantvex — AI-Powered Trading Signals & Automation',
+    description:
+      'High-confidence AI trading signals, automated execution, and risk-first controls.',
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
