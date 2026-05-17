@@ -59,7 +59,7 @@ export default function TradeSignalsPage() {
     if (!isLoaded) return;
     try {
       const token = await getToken();
-      if (!token) { router.push('/sign-in'); return; }
+      if (!token) return; // Clerk middleware protects this route
       const data = await apiFetch<Signal[]>('/signals/?limit=50', {}, token).catch(e => {
         if (e instanceof ApiError && e.status === 402) {
            router.push('/pricing');
@@ -73,7 +73,7 @@ export default function TradeSignalsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, isLoaded, getToken]);
+  }, [isLoaded, getToken]);
 
   useEffect(() => { if (isLoaded) load(); }, [load, isLoaded]);
 

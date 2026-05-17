@@ -79,7 +79,9 @@ export default function DashboardOverview() {
     if (!isLoaded) return;
     try {
       const token = await getToken();
-      if (!token) { router.push('/sign-in'); return; }
+      // Don't redirect — Clerk middleware protects /dashboard server-side.
+      // If the token isn't ready yet, just bail and wait for the next render.
+      if (!token) return;
       const [s, sig, tr, pf] = await Promise.all([
         apiFetch<DashboardStats>('/users/me/dashboard', {}, token).catch(() => null),
         apiFetch<Signal[]>('/signals/', {}, token).catch(() => []),
@@ -95,7 +97,7 @@ export default function DashboardOverview() {
     } finally {
       setLoading(false);
     }
-  }, [router, isLoaded, getToken]);
+  }, [isLoaded, getToken]);
 
   useEffect(() => { if (isLoaded) load(); }, [load, isLoaded]);
 

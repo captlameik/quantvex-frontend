@@ -62,7 +62,7 @@ export default function PerformancePage() {
     if (!isLoaded) return;
     (async () => {
       const token = await getToken();
-      if (!token) { router.push('/sign-in'); return; }
+      if (!token) return; // Clerk middleware protects this route
       apiFetch<Trade[]>('/trades/', {}, token).then(data => {
         const closed = (data || []).filter(t => t.pnl != null);
         const pnls = closed.map(t => t.pnl as number);
@@ -83,7 +83,7 @@ export default function PerformancePage() {
         setLoading(false);
       }).catch(() => setLoading(false));
     })();
-  }, [router, isLoaded, getToken]);
+  }, [isLoaded, getToken]);
 
   const maxAbs = metrics ? Math.max(Math.abs(metrics.bestTrade), Math.abs(metrics.worstTrade)) : 1;
 

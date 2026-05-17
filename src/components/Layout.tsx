@@ -37,7 +37,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!authLoaded || !userLoaded) return;
-    if (!user) { router.push('/sign-in'); return; }
+    // Clerk middleware already protects /dashboard — do NOT redirect here.
+    // If the user object is null the middleware will handle it server-side.
+    if (!user) return;
 
     // Check admin status from Clerk public metadata
     if ((user.publicMetadata as any)?.is_admin) setIsAdmin(true);
@@ -45,6 +47,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     async function loadData() {
       try {
         const token = await getToken();
+        if (!token) return; // token not ready yet — skip silently
         const [s, t, me] = await Promise.all([
           apiFetch<any[]>('/signals/', {}, token).catch(() => []),
           apiFetch<any[]>('/trades/', {}, token).catch(() => []),

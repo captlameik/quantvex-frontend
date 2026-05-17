@@ -89,11 +89,13 @@ export async function apiFetch<T>(
   }
 
   if (response.status === 401) {
-    // With Clerk, redirect to sign-in page instead of clearing localStorage
+    // Clean up any stale legacy token
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('token'); // cleanup legacy token
-      window.location.href = '/sign-in';
+      localStorage.removeItem('token');
     }
+    // Do NOT hard-redirect here — the Clerk middleware already protects
+    // routes.  Hard redirects on 401 cause infinite loops when the token
+    // is momentarily unavailable (refresh, race condition, etc.).
     throw new ApiError(401, 'Session expired. Please log in again.');
   }
 

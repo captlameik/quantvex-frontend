@@ -19,7 +19,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!authLoaded || !userLoaded) return;
-    if (!user) { router.push('/sign-in'); return; }
+    if (!user) return; // Clerk middleware protects this route
     (async () => {
       const token = await getToken();
       apiFetch<{ active: boolean }>('/subscriptions/me', {}, token)
