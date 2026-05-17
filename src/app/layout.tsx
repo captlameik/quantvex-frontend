@@ -3,6 +3,7 @@ import { ReactNode } from 'react';
 import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
 import type { Metadata } from 'next';
+import ClerkTokenSync from '@/lib/ClerkTokenSync';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://quantvex.dev'),
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <html lang="en">
         <body className="bg-slate-950 text-slate-50">
+          <ClerkTokenSync />
           {children}
         </body>
       </html>
